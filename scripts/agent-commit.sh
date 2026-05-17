@@ -79,9 +79,17 @@ append_delete() {
 #   <status>\t<old>\t<new>    (R*, C*)
 while IFS=$'\t' read -r status p1 p2; do
   case "$status" in
-    A|M|T)  append_upsert "$p1" ;;
+    A|M|T)
+      # Skip gitlinks (mode 160000) — submodule references, not file content.
+      [ "$(mode_of "$p1")" = "160000" ] && continue
+      append_upsert "$p1"
+      ;;
     D)      append_delete "$p1" ;;
-    R*|C*)  append_delete "$p1"; append_upsert "$p2" ;;
+    R*|C*)
+      append_delete "$p1"
+      [ "$(mode_of "$p2")" = "160000" ] && continue
+      append_upsert "$p2"
+      ;;
     *)      echo "agent-commit: unsupported diff status: $status $p1" >&2; exit 1 ;;
   esac
 done < <(git diff --cached --name-status)

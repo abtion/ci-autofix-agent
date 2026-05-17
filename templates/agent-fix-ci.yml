@@ -1,0 +1,144 @@
+name: Agent — Fix CI
+
+on:
+  workflow_run:
+    workflows: ["CI"]   # Must match the name: field of your CI workflow exactly
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+# ─── Project configuration ────────────────────────────────────────────────────
+env:
+  # GitHub App bot name (without the [bot] suffix).
+  AGENT_BOT_NAME: "claude-autofixing-agent"
+
+  # ERE regex matching the CI job names this agent is allowed to fix.
+  # Jobs NOT in this list will never trigger the agent (saves API credits).
+  # Example for a Rails + TypeScript project:
+  #   FIXABLE_CI_JOBS: "rubocop|brakeman|tsc|eslint|jest|rspec|erb-lint|prettier|schema"
+  FIXABLE_CI_JOBS: "replace-with-your-fixable-job-names"
+
+  # Maximum Claude turns per run. Raise for complex codebases.
+  MAX_TURNS: "60"
+
+  # Extra Bash tool patterns the agent may call, beyond the built-in defaults.
+  # Format: comma-separated Bash(...) patterns (no surrounding quotes needed).
+  # Built-in defaults already include: git, gh, jq, grep, find, ls, cat, sed,
+  # awk, sort, uniq, diff, wc, cp, mv, rm, mkdir, head, tail, bash, and more.
+  # Example for a Rails project:
+  #   EXTRA_ALLOWED_TOOLS: "Bash(bundle:*),Bash(bin/rake:*),Bash(bin/rspec:*),Bash(bin/rubocop:*),Bash(psql:*),Bash(npm:*),Bash(npx:*)"
+  EXTRA_ALLOWED_TOOLS: ""
+# ──────────────────────────────────────────────────────────────────────────────
+
+concurrency:
+  group: agent-fix-ci-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  precheck:
+    # Only act on PR-triggered CI failures from the same repo (not forks).
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.precheck.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+      - uses: abtion/ci-autofix-agent/precheck@v1
+        id: precheck
+        with:
+          bot_name: ${{ env.AGENT_BOT_NAME }}
+          fixable_jobs: ${{ env.FIXABLE_CI_JOBS }}
+          workflow_run_id: ${{ github.event.workflow_run.id }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+
+  fix:
+    needs: precheck
+    # Same-repo guard repeated as defence-in-depth — workflow_run holds secrets.
+    if: |
+      needs.precheck.outputs.enabled == 'true' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    # ── Database / service containers ─────────────────────────────────────────
+    # Uncomment and adapt if your project needs a database or other services.
+    # Services must be declared here (GitHub Actions limitation — they cannot
+    # be conditionally added inside a reusable action).
+    #
+    # env:
+    #   DATABASE_URL: postgres://postgres:postgres@localhost:5432
+    #   RAILS_ENV: test
+    #
+    # services:
+    #   postgres:
+    #     image: postgres:15
+    #     env:
+    #       POSTGRES_USER: postgres
+    #       POSTGRES_PASSWORD: postgres
+    #       POSTGRES_HOST_AUTH_METHOD: trust
+    #     ports:
+    #       - 5432:5432
+    #     options: --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 5
+    # ──────────────────────────────────────────────────────────────────────────
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+
+      # ── Project-specific setup ─────────────────────────────────────────────
+      # Add the steps needed to make your CI commands runnable on a fresh
+      # Ubuntu runner. These run before Claude so the agent can reproduce and
+      # verify fixes locally.
+      #
+      # Ruby / Rails example:
+      #   - name: Install apt packages
+      #     run: sudo apt-get -y install libpq-dev imagemagick
+      #   - uses: ruby/setup-ruby@v1
+      #     with:
+      #       bundler-cache: true
+      #   - name: Set up database
+      #     run: |
+      #       bin/rake db:create
+      #       bin/rake db:schema:load
+      #
+      # Node.js example:
+      #   - uses: actions/setup-node@v6
+      #     with:
+      #       node-version-file: ".tool-versions"
+      #       cache: "npm"
+      #   - run: npm ci
+      #
+      # pnpm example:
+      #   - uses: pnpm/action-setup@v6
+      #     with:
+      #       version: 9
+      #   - uses: actions/setup-node@v6
+      #     with:
+      #       node-version: 20
+      #       cache: pnpm
+      #   - run: pnpm install --frozen-lockfile
+      # ──────────────────────────────────────────────────────────────────────
+
+      - name: Run CI autofix agent
+        uses: abtion/ci-autofix-agent/run-agent@v1
+        with:
+          app_id: ${{ secrets.AUTOFIX_APP_ID }}
+          app_private_key: ${{ secrets.AUTOFIX_PRIVATE_KEY }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          bot_name: ${{ env.AGENT_BOT_NAME }}
+          max_turns: ${{ env.MAX_TURNS }}
+          allowed_tools: ${{ env.EXTRA_ALLOWED_TOOLS }}

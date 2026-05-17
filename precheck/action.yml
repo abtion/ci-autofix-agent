@@ -1,0 +1,69 @@
+name: 'CI Autofix — Precheck'
+description: >
+  Kill-switch check, fixable-jobs filter, and consecutive-retry guard.
+  Must be called after actions/checkout (fetch-depth: 0) in the same job.
+
+inputs:
+  bot_name:
+    description: 'GitHub App bot name (without the [bot] suffix)'
+    required: true
+  fixable_jobs:
+    description: 'ERE regex matching CI job names the agent can fix (e.g. "rubocop|jest|eslint")'
+    required: true
+  workflow_run_id:
+    description: 'ID of the failed workflow run'
+    required: true
+  github_token:
+    description: 'Token for gh CLI calls (GITHUB_TOKEN is sufficient)'
+    required: true
+  repository:
+    description: 'Repository in owner/repo format'
+    required: true
+
+outputs:
+  enabled:
+    description: "'true' if the agent should run, 'false' if it should be skipped"
+    value: ${{ steps.check.outputs.enabled }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
+        REPO: ${{ inputs.repository }}
+        FIXABLE_CI_JOBS: ${{ inputs.fixable_jobs }}
+        BOT_LOGIN: ${{ inputs.bot_name }}[bot]
+      run: |
+        if [ -f .github/CI_AUTOFIX_DISABLED ]; then
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "Autofix agent disabled via kill-switch file."
+          exit 0
+        fi
+
+        failed_jobs=$(gh run view "$WORKFLOW_RUN_ID" \
+          --repo "$REPO" \
+          --json jobs \
+          --jq '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null || true)
+        echo "Failed jobs:"
+        echo "$failed_jobs"
+        if ! echo "$failed_jobs" | grep -qE "^(${FIXABLE_CI_JOBS})$"; then
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "No fixable jobs failed; skipping."
+          exit 0
+        fi
+
+        count=0
+        while IFS= read -r name; do
+          [ "$name" = "$BOT_LOGIN" ] || break
+          count=$((count + 1))
+        done < <(git log --format="%an")
+        echo "Consecutive agent commits at HEAD: ${count}"
+        if [ "$count" -ge 3 ]; then
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "Max retries reached (${count}/3); skipping."
+        else
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        fi

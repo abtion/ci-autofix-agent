@@ -74,7 +74,7 @@ runs:
       run: |
         mkdir -p .git/info
         # Never let the agent accidentally commit these directories.
-        for entry in '.agent-context/' 'vendor/bundle/'; do
+        for entry in '.agent-context/' 'vendor/bundle/' '.github/scripts/agent-commit.sh'; do
           grep -qxF "$entry" .git/info/exclude 2>/dev/null || echo "$entry" >> .git/info/exclude
         done
 

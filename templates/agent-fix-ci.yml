@@ -24,6 +24,9 @@ env:
   # Maximum Claude turns per run. Raise for complex codebases.
   MAX_TURNS: "60"
 
+  # Claude model to use. Defaults to claude-sonnet-4-6.
+  MODEL: "claude-sonnet-4-6"
+
   # Extra Bash tool patterns the agent may call, beyond the built-in defaults.
   # Format: comma-separated Bash(...) patterns (no surrounding quotes needed).
   # Built-in defaults already include: git, gh, jq, grep, find, ls, cat, sed,
@@ -141,4 +144,5 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           bot_name: ${{ env.AGENT_BOT_NAME }}
           max_turns: ${{ env.MAX_TURNS }}
+          model: ${{ env.MODEL }}
           allowed_tools: ${{ env.EXTRA_ALLOWED_TOOLS }}

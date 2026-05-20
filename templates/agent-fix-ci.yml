@@ -1,14 +1,17 @@
-name: Agent — Fix CI
+name: Agent — Fix CI / Address Reviews
 
 on:
   workflow_run:
     workflows: ["CI"]   # Must match the name: field of your CI workflow exactly
     types: [completed]
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: read
   actions: read
   issues: write
+  pull-requests: read
 
 # ─── Project configuration ────────────────────────────────────────────────────
 env:
@@ -37,41 +40,54 @@ env:
 # ──────────────────────────────────────────────────────────────────────────────
 
 concurrency:
-  group: agent-fix-ci-${{ github.event.workflow_run.head_branch }}
+  group: agent-fix-ci-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
   cancel-in-progress: true
 
 jobs:
   precheck:
-    # Only act on PR-triggered CI failures from the same repo (not forks).
+    # Two triggers: PR-triggered CI failures from the same repo, OR a PR review
+    # submitted on a same-repo PR. Approvals never trigger work; only
+    # changes_requested or commented reviews do.
     if: |
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'pull_request_review' &&
+       contains(fromJSON('["changes_requested","commented"]'), github.event.review.state) &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     outputs:
       enabled: ${{ steps.precheck.outputs.enabled }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
           fetch-depth: 0
       - uses: abtion/ci-autofix-agent/precheck@v1
         id: precheck
         with:
           bot_name: ${{ env.AGENT_BOT_NAME }}
           fixable_jobs: ${{ env.FIXABLE_CI_JOBS }}
+          # Empty for pull_request_review; the precheck then skips fixable-jobs check.
           workflow_run_id: ${{ github.event.workflow_run.id }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
 
   fix:
     needs: precheck
-    # Same-repo guard repeated as defence-in-depth — workflow_run holds secrets.
+    # Same-repo guards repeated as defence-in-depth — both workflow_run and
+    # pull_request_review expose write tokens and secrets to the workflow.
     if: |
-      needs.precheck.outputs.enabled == 'true' &&
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      needs.precheck.outputs.enabled == 'true' && (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'failure' &&
+         github.event.workflow_run.event == 'pull_request' &&
+         github.event.workflow_run.head_repository.full_name == github.repository) ||
+        (github.event_name == 'pull_request_review' &&
+         contains(fromJSON('["changes_requested","commented"]'), github.event.review.state) &&
+         github.event.pull_request.head.repo.full_name == github.repository)
+      )
     runs-on: ubuntu-latest
 
     # ── Database / service containers ─────────────────────────────────────────
@@ -99,7 +115,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       # ── Project-specific setup ─────────────────────────────────────────────

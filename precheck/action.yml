@@ -11,8 +11,9 @@ inputs:
     description: 'ERE regex matching CI job names the agent can fix (e.g. "rubocop|jest|eslint")'
     required: true
   workflow_run_id:
-    description: 'ID of the failed workflow run'
-    required: true
+    description: 'ID of the failed workflow run. Leave empty for non-workflow_run events (e.g. pull_request_review); the fixable-jobs check is then skipped.'
+    required: false
+    default: ''
   github_token:
     description: 'Token for gh CLI calls (GITHUB_TOKEN is sufficient)'
     required: true
@@ -43,16 +44,22 @@ runs:
           exit 0
         fi
 
-        failed_jobs=$(gh run view "$WORKFLOW_RUN_ID" \
-          --repo "$REPO" \
-          --json jobs \
-          --jq '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null || true)
-        echo "Failed jobs:"
-        echo "$failed_jobs"
-        if ! echo "$failed_jobs" | grep -qE "^(${FIXABLE_CI_JOBS})$"; then
-          echo "enabled=false" >> "$GITHUB_OUTPUT"
-          echo "No fixable jobs failed; skipping."
-          exit 0
+        # Fixable-jobs check only applies when we have a failed workflow run.
+        # For non-workflow_run triggers (pull_request_review, etc.) skip it.
+        if [ -n "$WORKFLOW_RUN_ID" ]; then
+          failed_jobs=$(gh run view "$WORKFLOW_RUN_ID" \
+            --repo "$REPO" \
+            --json jobs \
+            --jq '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null || true)
+          echo "Failed jobs:"
+          echo "$failed_jobs"
+          if ! echo "$failed_jobs" | grep -qE "^(${FIXABLE_CI_JOBS})$"; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No fixable jobs failed; skipping."
+            exit 0
+          fi
+        else
+          echo "No workflow_run_id provided; skipping fixable-jobs check (non-CI trigger)."
         fi
 
         count=0

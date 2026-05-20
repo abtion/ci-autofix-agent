@@ -96,6 +96,7 @@ Create `.github/CI_AUTOFIX_DISABLED` (empty file) in your repository to immediat
 | `allowed_tools` | No | `""` | Extra comma-separated `Bash(...)` patterns |
 | `max_turns` | No | `60` | Maximum Claude turns |
 | `model` | No | `claude-sonnet-4-6` | Claude model to use |
+| `allowed_bots` | No | `dependabot[bot]` | Comma-separated bot accounts (with `[bot]` suffix) whose events the agent may act on. Use `*` to allow all bots. |
 
 ## Versioning
 

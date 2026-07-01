@@ -24,6 +24,12 @@ env:
   #   FIXABLE_CI_JOBS: "rubocop|brakeman|tsc|eslint|jest|rspec|erb-lint|prettier|schema"
   FIXABLE_CI_JOBS: "replace-with-your-fixable-job-names"
 
+  # Comma-separated bot accounts (with the [bot] suffix) allowed to TRIGGER the
+  # agent — e.g. a failed CI run on a Dependabot PR. Add others if their PRs
+  # break CI (e.g. "dependabot[bot],renovate[bot]"). Use "*" to allow all bots
+  # (avoid "*" on public repos — external Apps could invoke the agent).
+  ALLOWED_BOTS: "dependabot[bot]"
+
   # Maximum Claude turns per run. Raise for complex codebases.
   MAX_TURNS: "60"
 
@@ -162,3 +168,4 @@ jobs:
           max_turns: ${{ env.MAX_TURNS }}
           model: ${{ env.MODEL }}
           allowed_tools: ${{ env.EXTRA_ALLOWED_TOOLS }}
+          allowed_bots: ${{ env.ALLOWED_BOTS }}

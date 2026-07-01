@@ -1,14 +1,39 @@
 # ci-autofix-agent
 
-A reusable GitHub Action that automatically diagnoses and fixes CI failures using Claude Code. When CI fails on a pull request, the agent reads the logs, reproduces the failure locally, applies the minimum fix, and commits a GitHub-signed (Verified) commit back to the branch.
+A reusable GitHub Action that puts Claude Code to work on your pull requests. It responds to two kinds of events:
 
-## How it works
+- **CI failed** — the agent reads the failed logs, reproduces the failure, and applies the minimum fix.
+- **A reviewer left feedback** — the agent reads the review and addresses the actionable comments.
 
-1. Your CI workflow fails on a PR
-2. `agent-fix-ci.yml` triggers via `workflow_run`
-3. A **precheck** validates that the failure is fixable and the retry limit hasn't been reached
-4. The **run-agent** action downloads the failed logs, invokes Claude Code, and posts the result as a PR comment
-5. Commits are created via the GitHub API using a GitHub App token, so they show as **Verified**
+In both cases the agent verifies its changes locally and commits a GitHub-signed (**Verified**) commit straight back to the PR branch — never a new branch, never a force-push.
+
+## Triggers
+
+The workflow (`agent-fix-ci.yml`) listens for two events, and the trigger decides what context the agent receives and what counts as "done".
+
+### CI failure — `workflow_run`
+
+1. Your CI workflow fails on a PR.
+2. The agent triggers via `workflow_run`.
+3. It downloads the failed job logs, diagnoses the root cause, reproduces the failure locally, and applies the **minimum** fix.
+
+Only failures whose job names match `FIXABLE_CI_JOBS` are attempted — everything else is skipped to save credits (see [precheck](#precheck)).
+
+### PR review — `pull_request_review`
+
+1. A reviewer submits a review that **requests changes** or **comments** — approvals are ignored.
+2. The agent triggers via `pull_request_review`.
+3. It reads the PR description, general comments, review summary bodies (where Copilot/Gemini often leave their analysis), and unresolved inline review threads.
+4. It addresses the actionable code feedback with the minimum change, then posts a **"Comments considered"** summary that lists every comment as *addressed* or *skipped*, each with a one-line reason. Questions, off-topic, and out-of-scope comments are skipped.
+
+## What happens on every run
+
+Whichever event fires, the rest of the pipeline is shared:
+
+1. A **precheck** gates the run: the kill switch is off, the [retry limit](#precheck) hasn't been reached, and — for CI failures — a fixable job actually failed.
+2. **run-agent** generates a GitHub App token, resolves the PR, gathers the relevant context (failed logs for CI failures; the PR conversation whenever a PR is associated), and posts a status comment on the PR while it works.
+3. Claude Code makes the change and **verifies** it by running the project's checks from `CLAUDE.md` — this happens on review triggers too, so an edit never regresses CI.
+4. The commit is created through the GitHub API with the App token, so it lands as **Verified**. The status comment is then updated with the outcome — success, or the reason the agent couldn't act — along with cost and turn count.
 
 ## Prerequisites
 
@@ -38,9 +63,11 @@ The App requires these permissions:
 
 #### `agent-fix-ci.yml` — copy and fill in manually
 
-Copy `templates/agent-fix-ci.yml` into `.github/workflows/agent-fix-ci.yml` in your repository and fill in the env vars at the top:
+The template already listens for both triggers (`workflow_run` and `pull_request_review`); copy it into `.github/workflows/agent-fix-ci.yml` in your repository and fill in the env vars at the top:
 - `AGENT_BOT_NAME` — pre-filled as `claude-autofixing-agent`, change only if using a different App
-- `FIXABLE_CI_JOBS` — ERE regex of job names the agent should attempt to fix
+- `FIXABLE_CI_JOBS` — ERE regex of job names the agent should attempt to fix (CI-failure trigger only)
+- `ALLOWED_BOTS` — bot accounts whose PRs may trigger the agent (default: `dependabot[bot]`; `*` allows all)
+- `MODEL` — Claude model to use (default: `claude-sonnet-4-6`)
 - `MAX_TURNS` — maximum Claude turns (default: 60)
 - `EXTRA_ALLOWED_TOOLS` — extra `Bash(...)` patterns beyond the built-in defaults
 
@@ -81,7 +108,7 @@ Create `.github/CI_AUTOFIX_DISABLED` (empty file) in your repository to immediat
 |---|---|---|
 | `bot_name` | Yes | GitHub App bot name (without `[bot]`) |
 | `fixable_jobs` | Yes | ERE regex of fixable CI job names |
-| `workflow_run_id` | Yes | ID of the failed workflow run |
+| `workflow_run_id` | No | ID of the failed workflow run. Leave empty for `pull_request_review` triggers; the fixable-jobs check is then skipped. |
 | `github_token` | Yes | Token for `gh` CLI calls (`GITHUB_TOKEN` is sufficient) |
 | `repository` | Yes | Repository in `owner/repo` format |
 

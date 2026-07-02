@@ -112,7 +112,6 @@ Create `.github/CI_AUTOFIX_DISABLED` (empty file) in your repository to immediat
 | `bot_name` | Yes | GitHub App bot name (without `[bot]`) |
 | `fixable_jobs` | Yes | ERE regex of fixable CI job names |
 | `workflow_run_id` | No | ID of the failed workflow run. Leave empty for `pull_request_review` triggers; the fixable-jobs check is then skipped. |
-| `review_actor_type` | No | Review author's account type (`github.event.review.user.type`). Empty for non-review triggers; the review-actor filter is then skipped. |
 | `allowed_review_actors` | No | For `pull_request_review`: which reviewer types may trigger — `bots` (default), `humans`, or `all`. |
 | `github_token` | Yes | Token for `gh` CLI calls (`GITHUB_TOKEN` is sufficient) |
 | `repository` | Yes | Repository in `owner/repo` format |

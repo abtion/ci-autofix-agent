@@ -14,19 +14,11 @@ inputs:
     description: 'ID of the failed workflow run. Leave empty for non-workflow_run events (e.g. pull_request_review); the fixable-jobs check is then skipped.'
     required: false
     default: ''
-  review_actor_type:
-    description: >
-      Account type of the review author for pull_request_review triggers
-      ("Bot" or "User"). Optional: when empty, precheck reads it from the event
-      payload itself, so the review-actor filter applies even if the caller does
-      not pass it. Empty/absent for non-review events → filter skipped.
-    required: false
-    default: ''
   allowed_review_actors:
     description: >
       For pull_request_review triggers: which reviewer account types may trigger
-      the agent — "bots" (default), "humans", or "all". Ignored when
-      review_actor_type is empty. A bot's review must ALSO clear the caller's
+      the agent — "bots" (default), "humans", or "all". Ignored for events other
+      than pull_request_review. A bot's review must ALSO clear the caller's
       allowed_bots list to actually run.
     required: false
     default: 'bots'
@@ -52,7 +44,6 @@ runs:
         WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
         REPO: ${{ inputs.repository }}
         FIXABLE_CI_JOBS: ${{ inputs.fixable_jobs }}
-        REVIEW_ACTOR_TYPE: ${{ inputs.review_actor_type }}
         ALLOWED_REVIEW_ACTORS: ${{ inputs.allowed_review_actors }}
         BOT_LOGIN: ${{ inputs.bot_name }}[bot]
       run: |
@@ -62,14 +53,13 @@ runs:
           exit 0
         fi
 
-        # Review-actor filter. Determine the review author's account type: prefer
-        # the explicit input, else read it straight from the event payload so the
-        # filter still applies when the caller workflow doesn't pass it (this is
-        # what makes the bots-only default self-enforcing). Empty for non-review
-        # events (no .review in the payload) → filter skipped. A bot's review must
-        # ALSO clear allowed_bots downstream.
-        review_actor_type="$REVIEW_ACTOR_TYPE"
-        if [ -z "$review_actor_type" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+        # Review-actor filter. Read the review author's account type straight from
+        # the event payload, so the bots-only default self-enforces without the
+        # caller wiring anything. Empty for non-review events (no .review in the
+        # payload) → filter skipped. A bot's review must ALSO clear allowed_bots
+        # downstream.
+        review_actor_type=""
+        if [ -f "$GITHUB_EVENT_PATH" ]; then
           review_actor_type=$(jq -r '.review.user.type // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
         fi
         if [ -n "$review_actor_type" ]; then

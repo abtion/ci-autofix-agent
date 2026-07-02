@@ -92,8 +92,6 @@ jobs:
           fixable_jobs: ${{ env.FIXABLE_CI_JOBS }}
           # Empty for pull_request_review; the precheck then skips fixable-jobs check.
           workflow_run_id: ${{ github.event.workflow_run.id }}
-          # Empty for non-review triggers; the review-actor filter is then skipped.
-          review_actor_type: ${{ github.event.review.user.type }}
           allowed_review_actors: ${{ env.REVIEW_TRIGGER_ACTORS }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}

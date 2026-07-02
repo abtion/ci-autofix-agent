@@ -93,6 +93,7 @@ jobs:
           # Empty for pull_request_review; the precheck then skips fixable-jobs check.
           workflow_run_id: ${{ github.event.workflow_run.id }}
           allowed_review_actors: ${{ env.REVIEW_TRIGGER_ACTORS }}
+          allowed_bots: ${{ env.ALLOWED_BOTS }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
 

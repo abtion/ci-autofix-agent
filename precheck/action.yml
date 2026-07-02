@@ -22,6 +22,15 @@ inputs:
       allowed_bots list to actually run.
     required: false
     default: 'bots'
+  allowed_bots:
+    description: >
+      Comma-separated bot logins allowed to trigger via a pull_request_review,
+      matched case-insensitively (ignoring a trailing "[bot]") against the
+      workflow actor github.actor — the same identity claude-code-action checks.
+      Mirror the value passed to run-agent. Default "*" disables this early check
+      and defers entirely to run-agent's own allow-list.
+    required: false
+    default: '*'
   github_token:
     description: 'Token for gh CLI calls (GITHUB_TOKEN is sufficient)'
     required: true
@@ -45,6 +54,7 @@ runs:
         REPO: ${{ inputs.repository }}
         FIXABLE_CI_JOBS: ${{ inputs.fixable_jobs }}
         ALLOWED_REVIEW_ACTORS: ${{ inputs.allowed_review_actors }}
+        ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         BOT_LOGIN: ${{ inputs.bot_name }}[bot]
       run: |
         if [ -f .github/CI_AUTOFIX_DISABLED ]; then
@@ -87,6 +97,32 @@ runs:
               exit 0
               ;;
           esac
+
+          # For bot reviews, reject non-allow-listed bots here — before the fix
+          # job spins up — mirroring claude-code-action's allowed_bots gate. Match
+          # on the workflow actor (github.actor / GITHUB_ACTOR), the same identity
+          # claude-code-action checks, normalized the same way (lowercased, any
+          # trailing "[bot]" stripped). Humans bypass allowed_bots (their write
+          # access is enforced downstream). ALLOWED_BOTS="*" disables this check.
+          if [ "$review_actor_type" = "Bot" ]; then
+            norm() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/\[bot\]$//'; }
+            actor_norm=$(norm "$GITHUB_ACTOR")
+            bot_allowed=false
+            IFS=',' read -ra _allow <<< "$ALLOWED_BOTS" || true
+            for entry in "${_allow[@]}"; do
+              entry=$(printf '%s' "$entry" | tr -d '[:space:]')
+              [ -z "$entry" ] && continue
+              if [ "$entry" = "*" ] || [ "$(norm "$entry")" = "$actor_norm" ]; then
+                bot_allowed=true
+                break
+              fi
+            done
+            if [ "$bot_allowed" != "true" ]; then
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+              echo "Bot reviewer '${GITHUB_ACTOR}' is not in allowed_bots; skipping (add it to allowed_bots or use '*')."
+              exit 0
+            fi
+          fi
         fi
 
         # Fixable-jobs check only applies when we have a failed workflow run.

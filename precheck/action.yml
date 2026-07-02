@@ -14,6 +14,21 @@ inputs:
     description: 'ID of the failed workflow run. Leave empty for non-workflow_run events (e.g. pull_request_review); the fixable-jobs check is then skipped.'
     required: false
     default: ''
+  review_actor_type:
+    description: >
+      Account type of the review author for pull_request_review triggers —
+      github.event.review.user.type ("Bot" or "User"). Leave empty for other
+      events; the review-actor filter is then skipped.
+    required: false
+    default: ''
+  allowed_review_actors:
+    description: >
+      For pull_request_review triggers: which reviewer account types may trigger
+      the agent — "bots" (default), "humans", or "both". Ignored when
+      review_actor_type is empty. A bot's review must ALSO clear the caller's
+      allowed_bots list to actually run.
+    required: false
+    default: 'bots'
   github_token:
     description: 'Token for gh CLI calls (GITHUB_TOKEN is sufficient)'
     required: true
@@ -36,12 +51,44 @@ runs:
         WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
         REPO: ${{ inputs.repository }}
         FIXABLE_CI_JOBS: ${{ inputs.fixable_jobs }}
+        REVIEW_ACTOR_TYPE: ${{ inputs.review_actor_type }}
+        ALLOWED_REVIEW_ACTORS: ${{ inputs.allowed_review_actors }}
         BOT_LOGIN: ${{ inputs.bot_name }}[bot]
       run: |
         if [ -f .github/CI_AUTOFIX_DISABLED ]; then
           echo "enabled=false" >> "$GITHUB_OUTPUT"
           echo "Autofix agent disabled via kill-switch file."
           exit 0
+        fi
+
+        # Review-actor filter (pull_request_review only). REVIEW_ACTOR_TYPE is the
+        # review author's account type; empty for non-review triggers, where this
+        # check is skipped. A bot's review must ALSO clear allowed_bots downstream.
+        if [ -n "$REVIEW_ACTOR_TYPE" ]; then
+          case "$ALLOWED_REVIEW_ACTORS" in
+            bots)
+              if [ "$REVIEW_ACTOR_TYPE" != "Bot" ]; then
+                echo "enabled=false" >> "$GITHUB_OUTPUT"
+                echo "Review by a ${REVIEW_ACTOR_TYPE}; only bot reviews trigger the agent (allowed_review_actors=bots)."
+                exit 0
+              fi
+              ;;
+            humans)
+              if [ "$REVIEW_ACTOR_TYPE" != "User" ]; then
+                echo "enabled=false" >> "$GITHUB_OUTPUT"
+                echo "Review by a ${REVIEW_ACTOR_TYPE}; only human reviews trigger the agent (allowed_review_actors=humans)."
+                exit 0
+              fi
+              ;;
+            both|all)
+              : # both bot and human reviews allowed
+              ;;
+            *)
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+              echo "Invalid allowed_review_actors='${ALLOWED_REVIEW_ACTORS}' (expected bots|humans|both); skipping."
+              exit 0
+              ;;
+          esac
         fi
 
         # Fixable-jobs check only applies when we have a failed workflow run.

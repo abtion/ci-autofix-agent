@@ -26,9 +26,20 @@ env:
 
   # Comma-separated bot accounts (with the [bot] suffix) allowed to TRIGGER the
   # agent — e.g. a failed CI run on a Dependabot PR. Add others if their PRs
-  # break CI (e.g. "dependabot[bot],renovate[bot]"). Use "*" to allow all bots
-  # (avoid "*" on public repos — external Apps could invoke the agent).
+  # break CI (e.g. "dependabot[bot],renovate[bot]"). This ALSO gates which bots'
+  # PR reviews may trigger the agent: to act on an AI reviewer's feedback, add
+  # its login here (e.g. "copilot-pull-request-reviewer[bot]",
+  # "gemini-code-assist[bot]"). Use "*" to allow all bots (avoid "*" on public
+  # repos — external Apps could invoke the agent).
   ALLOWED_BOTS: "dependabot[bot]"
+
+  # For pull_request_review triggers: which reviewer account types may trigger
+  # the agent. One of:
+  #   bots   — only bot reviews (Copilot, Gemini, etc.) — default
+  #   humans — only human reviews
+  #   both   — either
+  # A bot reviewer must ALSO be listed in ALLOWED_BOTS above to trigger.
+  REVIEW_TRIGGER_ACTORS: "bots"
 
   # Maximum Claude turns per run. Raise for complex codebases.
   MAX_TURNS: "60"
@@ -77,6 +88,9 @@ jobs:
           fixable_jobs: ${{ env.FIXABLE_CI_JOBS }}
           # Empty for pull_request_review; the precheck then skips fixable-jobs check.
           workflow_run_id: ${{ github.event.workflow_run.id }}
+          # Empty for non-review triggers; the review-actor filter is then skipped.
+          review_actor_type: ${{ github.event.review.user.type }}
+          allowed_review_actors: ${{ env.REVIEW_TRIGGER_ACTORS }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
 

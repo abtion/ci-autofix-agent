@@ -25,7 +25,7 @@ inputs:
   allowed_review_actors:
     description: >
       For pull_request_review triggers: which reviewer account types may trigger
-      the agent — "bots" (default), "humans", or "both". Ignored when
+      the agent — "bots" (default), "humans", or "all". Ignored when
       review_actor_type is empty. A bot's review must ALSO clear the caller's
       allowed_bots list to actually run.
     required: false
@@ -88,12 +88,12 @@ runs:
                 exit 0
               fi
               ;;
-            both|all)
-              : # both bot and human reviews allowed
+            all)
+              : # all reviewers (bot + human) allowed
               ;;
             *)
               echo "enabled=false" >> "$GITHUB_OUTPUT"
-              echo "Invalid allowed_review_actors='${ALLOWED_REVIEW_ACTORS}' (expected bots|humans|both); skipping."
+              echo "Invalid allowed_review_actors='${ALLOWED_REVIEW_ACTORS}' (expected bots|humans|all); skipping."
               exit 0
               ;;
           esac

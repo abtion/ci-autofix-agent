@@ -41,7 +41,7 @@ env:
   # the agent. One of:
   #   bots   — only bot reviews (Copilot, Gemini, etc.) — default
   #   humans — only human reviews
-  #   both   — either
+  #   all    — either
   # A bot reviewer must ALSO be listed in ALLOWED_BOTS above to trigger.
   REVIEW_TRIGGER_ACTORS: "bots"
 

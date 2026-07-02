@@ -26,7 +26,7 @@ Only failures whose job names match `FIXABLE_CI_JOBS` are attempted — everythi
 3. It reads the PR description, general comments, review summary bodies (where Copilot/Gemini often leave their analysis), and unresolved inline review threads.
 4. It addresses the actionable code feedback with the minimum change, then posts a **"Comments considered"** summary that lists every comment as *addressed* or *skipped*, each with a one-line reason. Questions, off-topic, and out-of-scope comments are skipped.
 
-By default only **bot** reviews (Copilot, Gemini, etc.) trigger the agent; set `REVIEW_TRIGGER_ACTORS` to `humans` or `both` to change that. A bot reviewer must additionally be listed in `ALLOWED_BOTS` — the two filters compose.
+By default only **bot** reviews (Copilot, Gemini, etc.) trigger the agent; set `REVIEW_TRIGGER_ACTORS` to `humans` or `all` to change that. A bot reviewer must additionally be listed in `ALLOWED_BOTS` — the two filters compose.
 
 ## What happens on every run
 
@@ -69,7 +69,7 @@ The template already listens for both triggers (`workflow_run` and `pull_request
 - `AGENT_BOT_NAME` — pre-filled as `claude-autofixing-agent`, change only if using a different App
 - `FIXABLE_CI_JOBS` — ERE regex of job names the agent should attempt to fix (CI-failure trigger only)
 - `ALLOWED_BOTS` — accounts allowed to trigger the agent, matched against the workflow actor `github.actor` (default: `dependabot[bot]`; `*` allows all). The actor isn't always the review author: GitHub's built-in Copilot review runs as actor `Copilot`, so add `Copilot` (not `copilot-pull-request-reviewer[bot]`) to act on it
-- `REVIEW_TRIGGER_ACTORS` — on PR reviews, which reviewer types trigger the agent: `bots` (default), `humans`, or `both`. Bot reviewers must also be in `ALLOWED_BOTS`
+- `REVIEW_TRIGGER_ACTORS` — on PR reviews, which reviewer types trigger the agent: `bots` (default), `humans`, or `all`. Bot reviewers must also be in `ALLOWED_BOTS`
 - `MODEL` — Claude model to use (default: `claude-sonnet-4-6`)
 - `MAX_TURNS` — maximum Claude turns (default: 60)
 - `EXTRA_ALLOWED_TOOLS` — extra `Bash(...)` patterns beyond the built-in defaults
@@ -113,7 +113,7 @@ Create `.github/CI_AUTOFIX_DISABLED` (empty file) in your repository to immediat
 | `fixable_jobs` | Yes | ERE regex of fixable CI job names |
 | `workflow_run_id` | No | ID of the failed workflow run. Leave empty for `pull_request_review` triggers; the fixable-jobs check is then skipped. |
 | `review_actor_type` | No | Review author's account type (`github.event.review.user.type`). Empty for non-review triggers; the review-actor filter is then skipped. |
-| `allowed_review_actors` | No | For `pull_request_review`: which reviewer types may trigger — `bots` (default), `humans`, or `both`. |
+| `allowed_review_actors` | No | For `pull_request_review`: which reviewer types may trigger — `bots` (default), `humans`, or `all`. |
 | `github_token` | Yes | Token for `gh` CLI calls (`GITHUB_TOKEN` is sufficient) |
 | `repository` | Yes | Repository in `owner/repo` format |
 

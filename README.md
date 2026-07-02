@@ -68,7 +68,7 @@ The App requires these permissions:
 The template already listens for both triggers (`workflow_run` and `pull_request_review`); copy it into `.github/workflows/agent-fix-ci.yml` in your repository and fill in the env vars at the top:
 - `AGENT_BOT_NAME` — pre-filled as `claude-autofixing-agent`, change only if using a different App
 - `FIXABLE_CI_JOBS` — ERE regex of job names the agent should attempt to fix (CI-failure trigger only)
-- `ALLOWED_BOTS` — bot accounts whose PRs *or reviews* may trigger the agent (default: `dependabot[bot]`; `*` allows all). To act on an AI reviewer's feedback, add its login (e.g. `copilot-pull-request-reviewer[bot]`)
+- `ALLOWED_BOTS` — accounts allowed to trigger the agent, matched against the workflow actor `github.actor` (default: `dependabot[bot]`; `*` allows all). The actor isn't always the review author: GitHub's built-in Copilot review runs as actor `Copilot`, so add `Copilot` (not `copilot-pull-request-reviewer[bot]`) to act on it
 - `REVIEW_TRIGGER_ACTORS` — on PR reviews, which reviewer types trigger the agent: `bots` (default), `humans`, or `both`. Bot reviewers must also be in `ALLOWED_BOTS`
 - `MODEL` — Claude model to use (default: `claude-sonnet-4-6`)
 - `MAX_TURNS` — maximum Claude turns (default: 60)

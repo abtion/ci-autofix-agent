@@ -24,13 +24,17 @@ env:
   #   FIXABLE_CI_JOBS: "rubocop|brakeman|tsc|eslint|jest|rspec|erb-lint|prettier|schema"
   FIXABLE_CI_JOBS: "replace-with-your-fixable-job-names"
 
-  # Comma-separated bot accounts (with the [bot] suffix) allowed to TRIGGER the
-  # agent — e.g. a failed CI run on a Dependabot PR. Add others if their PRs
-  # break CI (e.g. "dependabot[bot],renovate[bot]"). This ALSO gates which bots'
-  # PR reviews may trigger the agent: to act on an AI reviewer's feedback, add
-  # its login here (e.g. "copilot-pull-request-reviewer[bot]",
-  # "gemini-code-assist[bot]"). Use "*" to allow all bots (avoid "*" on public
-  # repos — external Apps could invoke the agent).
+  # Comma-separated accounts allowed to TRIGGER the agent, matched against the
+  # workflow actor (github.actor). Covers CI failures on a bot's PR (e.g.
+  # Dependabot) AND which reviewers' feedback the agent acts on. Add more as
+  # needed (e.g. "dependabot[bot],renovate[bot]"). Matching is case-insensitive
+  # and ignores a trailing "[bot]".
+  # NOTE: the actor is not always the review author. GitHub's built-in Copilot
+  # review runs as actor "Copilot", so allow "Copilot" (NOT
+  # "copilot-pull-request-reviewer[bot]") to act on it. When unsure, read the
+  # "Checking permissions for actor: <name>" line in the run log.
+  # Use "*" to allow all bots (avoid "*" on public repos — external Apps could
+  # invoke the agent).
   ALLOWED_BOTS: "dependabot[bot]"
 
   # For pull_request_review triggers: which reviewer account types may trigger

@@ -248,7 +248,7 @@ runs:
     - name: Run Claude Code
       id: run
       continue-on-error: true
-      uses: anthropics/claude-code-action@v1.0.108
+      uses: anthropics/claude-code-action@v1.0.162
       env:
         GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
       with:

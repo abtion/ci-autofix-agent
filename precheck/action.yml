@@ -16,9 +16,10 @@ inputs:
     default: ''
   review_actor_type:
     description: >
-      Account type of the review author for pull_request_review triggers —
-      github.event.review.user.type ("Bot" or "User"). Leave empty for other
-      events; the review-actor filter is then skipped.
+      Account type of the review author for pull_request_review triggers
+      ("Bot" or "User"). Optional: when empty, precheck reads it from the event
+      payload itself, so the review-actor filter applies even if the caller does
+      not pass it. Empty/absent for non-review events → filter skipped.
     required: false
     default: ''
   allowed_review_actors:
@@ -61,22 +62,29 @@ runs:
           exit 0
         fi
 
-        # Review-actor filter (pull_request_review only). REVIEW_ACTOR_TYPE is the
-        # review author's account type; empty for non-review triggers, where this
-        # check is skipped. A bot's review must ALSO clear allowed_bots downstream.
-        if [ -n "$REVIEW_ACTOR_TYPE" ]; then
+        # Review-actor filter. Determine the review author's account type: prefer
+        # the explicit input, else read it straight from the event payload so the
+        # filter still applies when the caller workflow doesn't pass it (this is
+        # what makes the bots-only default self-enforcing). Empty for non-review
+        # events (no .review in the payload) → filter skipped. A bot's review must
+        # ALSO clear allowed_bots downstream.
+        review_actor_type="$REVIEW_ACTOR_TYPE"
+        if [ -z "$review_actor_type" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+          review_actor_type=$(jq -r '.review.user.type // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+        fi
+        if [ -n "$review_actor_type" ]; then
           case "$ALLOWED_REVIEW_ACTORS" in
             bots)
-              if [ "$REVIEW_ACTOR_TYPE" != "Bot" ]; then
+              if [ "$review_actor_type" != "Bot" ]; then
                 echo "enabled=false" >> "$GITHUB_OUTPUT"
-                echo "Review by a ${REVIEW_ACTOR_TYPE}; only bot reviews trigger the agent (allowed_review_actors=bots)."
+                echo "Review by a ${review_actor_type}; only bot reviews trigger the agent (allowed_review_actors=bots)."
                 exit 0
               fi
               ;;
             humans)
-              if [ "$REVIEW_ACTOR_TYPE" != "User" ]; then
+              if [ "$review_actor_type" != "User" ]; then
                 echo "enabled=false" >> "$GITHUB_OUTPUT"
-                echo "Review by a ${REVIEW_ACTOR_TYPE}; only human reviews trigger the agent (allowed_review_actors=humans)."
+                echo "Review by a ${review_actor_type}; only human reviews trigger the agent (allowed_review_actors=humans)."
                 exit 0
               fi
               ;;

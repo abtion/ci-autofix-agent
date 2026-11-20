@@ -30,7 +30,7 @@ inputs:
   model:
     description: 'Claude model to use'
     required: false
-    default: 'claude-sonnet-4-6'
+    default: 'claude-sonnet-5-5'
   allowed_bots:
     description: >
       Comma-separated list of bot accounts (including the [bot] suffix) whose

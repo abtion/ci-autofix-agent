@@ -48,8 +48,8 @@ env:
   # Maximum Claude turns per run. Raise for complex codebases.
   MAX_TURNS: "60"
 
-  # Claude model to use. Defaults to claude-sonnet-4-6.
-  MODEL: "claude-sonnet-4-6"
+  # Claude model to use.
+  MODEL: "claude-sonnet-5-5"
 
   # Extra Bash tool patterns the agent may call, beyond the built-in defaults.
   # Format: comma-separated Bash(...) patterns (no surrounding quotes needed).

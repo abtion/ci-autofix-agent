@@ -70,7 +70,7 @@ The template already listens for both triggers (`workflow_run` and `pull_request
 - `FIXABLE_CI_JOBS` — ERE regex of job names the agent should attempt to fix (CI-failure trigger only)
 - `ALLOWED_BOTS` — accounts allowed to trigger the agent, matched against the workflow actor `github.actor` (default: `dependabot[bot]`; `*` allows all). The actor isn't always the review author: GitHub's built-in Copilot review runs as actor `Copilot`, so add `Copilot` (not `copilot-pull-request-reviewer[bot]`) to act on it
 - `REVIEW_TRIGGER_ACTORS` — on PR reviews, which reviewer types trigger the agent: `bots` (default), `humans`, or `all`. Bot reviewers must also be in `ALLOWED_BOTS`
-- `MODEL` — Claude model to use (default: `claude-sonnet-4-6`)
+- `MODEL` — Claude model to use (default: `claude-sonnet-5-5`)
 - `MAX_TURNS` — maximum Claude turns (default: 60)
 - `EXTRA_ALLOWED_TOOLS` — extra `Bash(...)` patterns beyond the built-in defaults
 
@@ -127,7 +127,7 @@ Create `.github/CI_AUTOFIX_DISABLED` (empty file) in your repository to immediat
 | `bot_name` | Yes | — | GitHub App bot name (without `[bot]`) |
 | `allowed_tools` | No | `""` | Extra comma-separated `Bash(...)` patterns |
 | `max_turns` | No | `60` | Maximum Claude turns |
-| `model` | No | `claude-sonnet-4-6` | Claude model to use |
+| `model` | No | `claude-sonnet-5-5` | Claude model to use |
 | `allowed_bots` | No | `dependabot[bot]` | Comma-separated bot accounts (with `[bot]` suffix) whose events the agent may act on. Use `*` to allow all bots. |
 
 ## Versioning
